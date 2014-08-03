@@ -11,6 +11,15 @@ def execute_sql_script(stdin, filename):
     print('executing file: "{0}".'.format(filename))
     stdin.write('@"{0}"'.format(filename))
 
+def drop_schema(connstr, schema):
+    print('droping schema: "{0}".'.format(schema))
+    if run_sql_command(connstr, 'drop user {0} cascade;'.format(schema)):
+        print('"{0}" droped'.format(schema))
+        return True
+
+    return False
+
+
 def run_sql_script(connstr, filename, schema = None):
     command = ['sqlplus', '-S', connstr]
     sqlplus = Popen(command, stdin=PIPE, stdout = PIPE, stderr=PIPE, universal_newlines = True)

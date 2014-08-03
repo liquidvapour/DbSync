@@ -164,11 +164,8 @@ def sync_db(argReader):
 
 
 def drop_schema(argReader):
-    schema = argReader.get_schema()
-    print('droping schema: "{0}".'.format(schema))
-    output, error = runner.run_sql_command('{0}/{1}@{2}'.format(username, password, server), 'drop user {0} cascade;'.format(schema))
-    print(output)
-        
+    runner.drop_schema('{0}/{1}@{2}'.format(username, password, server), argReader.get_schema())
+            
 
 def main(argv):
     
