@@ -22,7 +22,7 @@ GET_ALL_SCHEMAS = """
     from dba_users
 """
 
-def does_schema_exist_in_db(schema):
+def schema_exists_in_db(schema):
     with cx_Oracle.connect(username, password, server) as cnn:
         cursor = cnn.cursor()
         schemas = [s[0].casefold() for s in cursor.execute(GET_ALL_SCHEMAS).fetchall()]
@@ -113,30 +113,35 @@ command
 
 def create_schema(schema):
     print('Running schema creation scripts for schema: "{0}".'.format(schema))
-    output, error = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), os.path.join('.', schema, 'create.user.sql'))
-    print(output)
-    print('error: "{0}".'.format(error))
-    print('schema ({0}) created.'.format(schema))
+    scriptSucceeded = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), os.path.join('.', schema, 'create.user.sql'))
+    if scriptSucceeded:
+        print('schema ({0}) created.'.format(schema))
+
+    return scriptSucceeded
 
 
 def run_script(filename, schema):
     print('Running script: "{0}".'.format(filename))
-    output, error = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), filename, schema)
-    print(output)
-    print('error: "{0}".'.format(error))
+    return runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), filename, schema)
 
+
+def run_all_scripts_in(root, schema):    
+    for f in get_all_files_in(root):
+        scriptPath = os.path.join(root, f)
+        if not run_script(scriptPath, schema):
+            print('failure running script: "{0}". stopping run!'.format(scriptPath))
+            break
+    
     
 def apply_base_line_scripts(schema):
     print("applying baseline scripts")
     root = os.path.join('.', schema, 'baseline')
-    for f in get_all_files_in(root):
-        run_script(os.path.join(root, f), schema)
-    
+    run_all_scripts_in(root, schema)
         
 def make_sure_schema_exists(schema):
-    if not does_schema_exist_in_db(schema):
-        create_schema(schema)
-        apply_base_line_scripts(schema)
+    if not schema_exists_in_db(schema):
+        if create_schema(schema):
+            apply_base_line_scripts(schema)
     else:
         print('schema "{0}" already exists.'.format(schema))
         
@@ -168,7 +173,6 @@ def main(argv):
     }
     
     argReader.process(actions)
-    
     
     
 def query_roles(connection):    
