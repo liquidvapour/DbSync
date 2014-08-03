@@ -22,10 +22,11 @@ GET_ALL_SCHEMAS = """
     from dba_users
 """
 
-def does_schema_exist_in_db(cnn, schema):
-    cursor = cnn.cursor()
-    schemas = [s[0].casefold() for s in cursor.execute(GET_ALL_SCHEMAS).fetchall()]
-    cursor.close()
+def does_schema_exist_in_db(schema):
+    with cx_Oracle.connect(username, password, server) as cnn:
+        cursor = cnn.cursor()
+        schemas = [s[0].casefold() for s in cursor.execute(GET_ALL_SCHEMAS).fetchall()]
+        cursor.close()
     return schema in schemas
     
 def raise_schema_to_version(schema, version):
@@ -53,13 +54,13 @@ def create_schema(cnn, schema):
     print('error: "{0}".'.format(error))
     print('schema ({0}) created.'.format(schema))
     
-def process_schema(cnn, schema):
+def process_schema(schema):
     if not schema in get_all_folders_in('.'):
         print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(schema))
         return
         
-    if not does_schema_exist_in_db(cnn, schema):
-        create_schema(cnn, schema)
+    if not does_schema_exist_in_db(schema):
+        create_schema(schema)
     else:
         print('schema "{0}" already exists.'.format(schema))
     
@@ -135,11 +136,7 @@ command
 
 
 def sync_db(argReader):
-    try:
-        with cx_Oracle.connect(username, password, server) as db:
-            process_schema(db, argReader.get_schema())
-    except Exception as ex:
-        print("Fatal error: {0}".format(ex))
+    process_schema(argReader.get_schema())
 
 def drop_schema(argReader):
     schema = argReader.get_schema()
