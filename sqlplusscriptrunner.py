@@ -1,11 +1,22 @@
 from subprocess import  Popen, PIPE
+import cx_Oracle
 
 class Runner(object):
     def __init__(self, username, password, host):
+        self.__username = username
+        self.__password = password
+        self.__host = host
         self.__connectionString = '{0}/{1}@{2}'.format(username, password, host)
     
     def run_sql_script(self, filename, schema = None):
         return run_sql_script(self.__connectionString, filename, schema)
+
+    def get_all_data_for(self, sqlScript):
+        with cx_Oracle.connect(self.__username, self.__password, self.__host) as cnn:
+            cursor = cnn.cursor()
+            result = cursor.execute(sqlScript).fetchall()
+            cursor.close()
+        return result
 
 
 

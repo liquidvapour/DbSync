@@ -17,17 +17,12 @@ import sqlplusscriptrunner as runner
 # when moving up to a particular version will run all scripts that have not already been applied until all scripts for 
 # the desired version are applied.
 
-GET_ALL_SCHEMAS = """
+GET_ALL_USERS = """
     select username 
     from dba_users
 """
 
-def schema_exists_in_db(schema):
-    with cx_Oracle.connect(username, password, server) as cnn:
-        cursor = cnn.cursor()
-        schemas = [s[0].casefold() for s in cursor.execute(GET_ALL_SCHEMAS).fetchall()]
-        cursor.close()
-    return schema in schemas
+
     
 def raise_schema_to_version(schema, version):
     pass
@@ -108,59 +103,69 @@ command
             actions[self.get_command()](self)
         else:
             print('no action provided for command: "{0}".'.format(self.get_command()))
-        
-
-
-def create_schema(schema):
-    print('Running schema creation scripts for schema: "{0}".'.format(schema))
-    scriptSucceeded = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), os.path.join('.', schema, 'create.user.sql'))
-    if scriptSucceeded:
-        print('schema ({0}) created.'.format(schema))
-
-    return scriptSucceeded
-
-
-def run_script(filename, schema):
-    return runner.Runner(username, password, server).run_sql_script(filename, schema)
-
-
-def run_all_scripts_in(root, schema):    
-    for f in get_all_files_in(root):
-        scriptPath = os.path.join(root, f)
-        if not run_script(scriptPath, schema):
-            print('failure running script: "{0}". stopping run!'.format(scriptPath))
-            break
     
-    
-def apply_base_line_scripts(schema):
-    print("applying baseline scripts")
-    root = os.path.join('.', schema, 'baseline')
-    run_all_scripts_in(root, schema)
-        
-
-def apply_schema_to_db(schema):
-    if not schema_exists_in_db(schema):
-        if create_schema(schema):
-            apply_base_line_scripts(schema)
-    else:
-        print('schema "{0}" already exists.'.format(schema))
-        
-
-def schema_folder_exists(schema):
-    if not schema in get_all_folders_in('.'):
-        print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(schema))
-        return False
-
-    return True
 
 
-def process_schema(schema):
-    if schema_folder_exists(schema):
-        apply_schema_to_db(schema)
 
-        
+class DbSyncher(object):
+    def __init__(self, username, password, host, schema, sqlRunner):
+        self.__schema = schema
+        self.__sqlRunner = sqlRunner
+
+    def go(self):
+        if self.schema_folder_exists():
+            self.apply_schema_to_db()        
+
+    def schema_folder_exists(self):
+        if not self.__schema in get_all_folders_in('.'):
+            print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(self.__schema))
+            return False
+
+        return True
+
+    def schema_exists_in_db(self):
+        userData = self.__sqlRunner.get_all_data_for(GET_ALL_USERS)
+        schemas = [s[0].casefold() for s in userData]
+        return self.__schema in schemas
+
+    def apply_schema_to_db(self):
+        if not self.schema_exists_in_db():
+            if self.create_schema():
+                self.apply_base_line_scripts()
+        else:
+            print('schema "{0}" already exists.'.format(self.__schema))
+
+    def create_schema(self):
+        print('Running schema creation scripts for schema: "{0}".'.format(self.__schema))
+        scriptSucceeded = self.__sqlRunner.run_sql_script(os.path.join('.', self.__schema, 'create.user.sql'))
+        if scriptSucceeded:
+            print('schema ({0}) created.'.format(self.__schema))
+
+        return scriptSucceeded
+
+    def apply_base_line_scripts(self):
+        print("applying baseline scripts")
+        root = os.path.join('.', self.__schema, 'baseline')
+        self.run_all_scripts_in(root)
+
+    def run_all_scripts_in(self, root):    
+        for f in get_all_files_in(root):
+            scriptPath = os.path.join(root, f)
+            if not self.run_script(scriptPath):
+                print('failure running script: "{0}". stopping run!'.format(scriptPath))
+                break        
+
+    def run_script(self, filename):
+        return self.__sqlRunner.run_sql_script(filename, self.__schema)
+
+
 def sync_db(argReader):
-    process_schema(argReader.get_schema())
+    DbSyncher(
+        username,
+        password, 
+        server, 
+        argReader.get_schema(), 
+        runner.Runner(username, password, server)).go()
 
 
 def drop_schema(argReader):
