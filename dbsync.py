@@ -44,11 +44,6 @@ def read_file(filename):
 
 def create_schema(cnn, schema):
     print('Running schema creation scripts for schema: "{0}".'.format(schema))
-#    cursor = cnn.cursor()
-#    createSchemaDdl = read_file()
-#    print('ddl: {0}'.format(createSchemaDdl))
-#    cursor.prepare(createSchemaDdl)
-#    cursor.execute(None)
     output, error = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), os.path.join('.', schema, 'create.user.sql'))
     print(output)
     print('error: "{0}".'.format(error))
