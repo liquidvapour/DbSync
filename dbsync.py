@@ -22,14 +22,10 @@ GET_ALL_USERS = """
     from dba_users
 """
 
-
-    
-def raise_schema_to_version(schema, version):
-    pass
-
     
 def get_all_folders_in(path):
     return [p for p in os.listdir(path) if os.path.isdir(os.path.join(path, p))]
+
 
 def get_all_files_in(path):
     return sorted([p for p in os.listdir(path) if os.path.isfile(os.path.join(path, p))])
@@ -39,7 +35,7 @@ username = 'system'
 password = 'password1234'
 server = 'localhost:1521/XE'    
 
-class ArgumentsReader:
+class ArgumentsReader(object):
     SYNC = "sync"
     DROP = "drop"
     COMMANDS = (SYNC, DROP)
@@ -115,6 +111,16 @@ class DbSyncher(object):
     def go(self):
         if self.schema_folder_exists():
             self.apply_schema_to_db()        
+
+        for folder in self.get_all_version_folders():
+            self.run_all_scripts_in(folder)
+
+    def get_all_version_folders(self):
+        root = os.path.join('.', self.__schema, 'versions')
+        folders = get_all_folders_in(root)
+        sortedFolders = sorted(folders, key=lambda a:StrictVersion(a))
+        print('version folders: "{0}"'.format(sortedFolders))
+        return [os.path.join(root, f) for f in sortedFolders]
 
     def schema_folder_exists(self):
         if not self.__schema in get_all_folders_in('.'):

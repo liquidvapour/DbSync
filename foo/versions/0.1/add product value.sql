@@ -1,2 +1,2 @@
 alter table product 
-    add (product number);
+    add (cost number(10,2));
