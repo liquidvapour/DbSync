@@ -121,7 +121,6 @@ def create_schema(schema):
 
 
 def run_script(filename, schema):
-    print('Running script: "{0}".'.format(filename))
     return runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), filename, schema)
 
 
@@ -138,19 +137,26 @@ def apply_base_line_scripts(schema):
     root = os.path.join('.', schema, 'baseline')
     run_all_scripts_in(root, schema)
         
-def make_sure_schema_exists(schema):
+
+def apply_schema_to_db(schema):
     if not schema_exists_in_db(schema):
         if create_schema(schema):
             apply_base_line_scripts(schema)
     else:
         print('schema "{0}" already exists.'.format(schema))
         
-def process_schema(schema):
+
+def schema_folder_exists(schema):
     if not schema in get_all_folders_in('.'):
         print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(schema))
-        return
-        
-    make_sure_schema_exists(schema)
+        return False
+
+    return True
+
+
+def process_schema(schema):
+    if schema_folder_exists(schema):
+        apply_schema_to_db(schema)
     
         
 def sync_db(argReader):
@@ -163,6 +169,7 @@ def drop_schema(argReader):
     output, error = runner.run_sql_command('{0}/{1}@{2}'.format(username, password, server), 'drop user {0} cascade;'.format(schema))
     print(output)
         
+
 def main(argv):
     
     argReader = ArgumentsReader(argv)
@@ -173,15 +180,9 @@ def main(argv):
     }
     
     argReader.process(actions)
-    
-    
-def query_roles(connection):    
-    cursor = connection.cursor()
-    cursor.execute('select id, name from role')
-    for item in cursor:
-        print('{0}, name: {1}'.format(item[0], item[1]))
-    cursor.close()
+
     
 if __name__ == '__main__':
     main(sys.argv[1:])
-    
+
+        
