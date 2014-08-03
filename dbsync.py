@@ -35,30 +35,11 @@ def raise_schema_to_version(schema, version):
     
 def get_all_folders_in(path):
     return [p for p in os.listdir(path) if os.path.isdir(os.path.join(path, p))]
-    
-def read_file(filename):
-    with open(filename, 'r') as f:
-        result = f.read()
-    f.close()
-    return result
 
-def create_schema(cnn, schema):
-    print('Running schema creation scripts for schema: "{0}".'.format(schema))
-    output, error = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), os.path.join('.', schema, 'create.user.sql'))
-    print(output)
-    print('error: "{0}".'.format(error))
-    print('schema ({0}) created.'.format(schema))
+def get_all_files_in(path):
+    return sorted([p for p in os.listdir(path) if os.path.isfile(os.path.join(path, p))])
     
-def process_schema(schema):
-    if not schema in get_all_folders_in('.'):
-        print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(schema))
-        return
         
-    if not does_schema_exist_in_db(schema):
-        create_schema(schema)
-    else:
-        print('schema "{0}" already exists.'.format(schema))
-    
 username = 'system'
 password = 'password1234'
 server = 'localhost:1521/XE'    
@@ -130,8 +111,46 @@ command
         
 
 
+def create_schema(schema):
+    print('Running schema creation scripts for schema: "{0}".'.format(schema))
+    output, error = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), os.path.join('.', schema, 'create.user.sql'))
+    print(output)
+    print('error: "{0}".'.format(error))
+    print('schema ({0}) created.'.format(schema))
+
+
+def run_script(filename, schema):
+    print('Running script: "{0}".'.format(filename))
+    output, error = runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), filename, schema)
+    print(output)
+    print('error: "{0}".'.format(error))
+
+    
+def apply_base_line_scripts(schema):
+    print("applying baseline scripts")
+    root = os.path.join('.', schema, 'baseline')
+    for f in get_all_files_in(root):
+        run_script(os.path.join(root, f), schema)
+    
+        
+def make_sure_schema_exists(schema):
+    if not does_schema_exist_in_db(schema):
+        create_schema(schema)
+        apply_base_line_scripts(schema)
+    else:
+        print('schema "{0}" already exists.'.format(schema))
+        
+def process_schema(schema):
+    if not schema in get_all_folders_in('.'):
+        print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(schema))
+        return
+        
+    make_sure_schema_exists(schema)
+    
+        
 def sync_db(argReader):
     process_schema(argReader.get_schema())
+
 
 def drop_schema(argReader):
     schema = argReader.get_schema()
