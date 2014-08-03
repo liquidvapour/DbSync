@@ -1,5 +1,14 @@
 from subprocess import  Popen, PIPE
 
+class Runner(object):
+    def __init__(self, username, password, host):
+        self.__connectionString = '{0}/{1}@{2}'.format(username, password, host)
+    
+    def run_sql_script(self, filename, schema = None):
+        return run_sql_script(self.__connectionString, filename, schema)
+
+
+
 def tell_sqlplus_to_exit_on_first_error_with_errorcode(stdin):
     stdin.write('WHENEVER SQLERROR EXIT 1;\n')
 

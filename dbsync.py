@@ -121,7 +121,7 @@ def create_schema(schema):
 
 
 def run_script(filename, schema):
-    return runner.run_sql_script('{0}/{1}@{2}'.format(username, password, server), filename, schema)
+    return runner.Runner(username, password, server).run_sql_script(filename, schema)
 
 
 def run_all_scripts_in(root, schema):    
@@ -157,7 +157,7 @@ def schema_folder_exists(schema):
 def process_schema(schema):
     if schema_folder_exists(schema):
         apply_schema_to_db(schema)
-    
+
         
 def sync_db(argReader):
     process_schema(argReader.get_schema())
