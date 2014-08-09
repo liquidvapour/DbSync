@@ -146,25 +146,13 @@ command
 
 
 
-class DbSyncher(object):
+class Db(object):
     def __init__(self, username, password, host, schema, sqlRunner):
         self.__schema = schema
         self.__sqlRunner = sqlRunner
         
         self.__allRunScripsByVersion = self.get_executed_scripts() if self.schema_exists_in_db() else {}
         print('allRunScriptsByVersion: {0}'.format(self.__allRunScripsByVersion))
-
-
-    def go(self, targetVersion):
-        if self.schema_folder_exists():
-            self.apply_schema_to_db()        
-
-        for folder, version in self.get_all_version_folders():
-            if targetVersion:
-                if targetVersion >= version:
-                    self.run_all_scripts_in(folder, version)
-            else:
-                self.run_all_scripts_in(folder, version)
 
     def get_executed_scripts(self):
         """Returns a dictionary where:
@@ -268,15 +256,34 @@ class DbSyncher(object):
     def run_script(self, filename):
         return self.__sqlRunner.run_sql_script(filename, self.__schema)
 
+class DbUpdater(object):
+    def __init__(self, db):
+        self.__db = db
+
+
+    def bring_to_verions(self, targetVersion):
+        if self.__db.schema_folder_exists():
+            self.__db.apply_schema_to_db()        
+
+        for folder, version in self.__db.get_all_version_folders():
+            if targetVersion:
+                if targetVersion >= version:
+                    self.__db.run_all_scripts_in(folder, version)
+            else:
+                self.__db.run_all_scripts_in(folder, version)
+
 
 
 def sync_db(argReader, sqlRunner):
-    DbSyncher(
+    db = Db(
         username,
         password, 
         server, 
         argReader.get_schema(), 
-        sqlRunner).go(argReader.get_target_version())
+        sqlRunner)
+    
+    updater = DbUpdater(db)
+    updater.bring_to_verions(argReader.get_target_version())
 
 
 def drop_schema(argReader, sqlRunner):
