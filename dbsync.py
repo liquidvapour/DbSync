@@ -25,10 +25,10 @@ GET_ALL_USERS = """
 
 CREATE_TRACKING_TABLE_SQL = """
     create table version_tracking (
-        id         number                        not null,
-        version    varchar2(15)                  not null,
-        script     varchar2(256)                 not null,
-        applied_on date          default sysdate not null,
+        id         number                                  not null,
+        version    varchar2(15)                            not null,
+        script     varchar2(256)                           not null,
+        applied_on timestamp     default current_timestamp not null,
         constraint version_tracking_pk primary key (id) enable validate)
 """
 
@@ -43,8 +43,8 @@ CREATE_TRACKING_TABLE_SEQ = """
 """
 
 INSERT_SCRIPT_INFO = """
-    insert into version_tracking
-    values (version_tracking_id_seq.nextval, :version, :script, :applied_on)
+    insert into version_tracking (id, version, script)
+    values (version_tracking_id_seq.nextval, :version, :script)
 """
     
 def get_all_folders_in(path):
@@ -67,20 +67,29 @@ class ArgumentsReader(object):
 ---------------
 db syncher help
 ---------------
-syntax: dbsyns.py -s <schema> [command]
+syntax: dbsyns.py -s <schema> -v <version> [command]
 
 arguments
 ---------
+-s | --schema
+    The schema you wish to apply.
+-v | --version 
+    The target version to bring database up to.
+
+    default: Bring database up to latest version.
+
 command 
     sync (default): syncronises the schema with source control
     drop: drops the schema.
+
 """
 
     def __init__(self, argv):
         print('argv: {0}'.format(argv))
         schema = ''
+        targetVersion = None
         try:
-            opts, args = getopt.getopt(argv, 'hs:', 'schema=')
+            opts, args = getopt.getopt(argv, 'hs:v:', 'schema=')
         except getopt.GetoptError:
             self.print_help_and_exit()
             
@@ -91,6 +100,8 @@ command
                 self.print_help_and_exit()
             elif opt in ('-s', '-schema'):
                 schema = arg
+            elif opt in ('-v', '-version'):
+                targetVersion = arg
         
         if len(args) > 0:
             self.__command = args[0].casefold()
@@ -107,6 +118,7 @@ command
             self.print_help_and_exit()
             
         self.__schema = schema
+        self.__targetVersion = StrictVersion(targetVersion) if targetVersion else None
         
 
     def get_command(self):
@@ -115,6 +127,10 @@ command
 
     def get_schema(self):
         return self.__schema
+
+
+    def get_target_version(self):
+        return self.__targetVersion
             
 
     def print_help_and_exit(self):    
@@ -131,8 +147,9 @@ command
 
 
 class DbSyncher(object):
-    def __init__(self, username, password, host, schema, sqlRunner):
+    def __init__(self, username, password, host, schema, targetVersion, sqlRunner):
         self.__schema = schema
+        self.__targetVersion = targetVersion
         self.__sqlRunner = sqlRunner
         
         self.__allRunScripsByVersion = sqlRunner.get_executed_scripts(schema) if self.schema_exists_in_db() else {}
@@ -146,8 +163,11 @@ class DbSyncher(object):
         self.__applied_scripts = self.__sqlRunner.get_executed_scripts(self.__schema)
 
         for folder, version in self.get_all_version_folders():
-            self.run_all_scripts_in(folder, version)
-
+            if self.__targetVersion:
+                if self.__targetVersion >= version:
+                    self.run_all_scripts_in(folder, version)
+            else:
+                self.run_all_scripts_in(folder, version)
 
     def get_all_version_folders(self):
         root = os.path.join('.', self.__schema, 'versions')
@@ -231,7 +251,7 @@ class DbSyncher(object):
 
 
     def record_script_as_run(self, scriptPath, version):
-        self.__sqlRunner.run_sql_command(INSERT_SCRIPT_INFO, self.__schema, {"version": str(version), "script": scriptPath, "applied_on": datetime.datetime.now()})
+        self.__sqlRunner.run_sql_command(INSERT_SCRIPT_INFO, self.__schema, {"version": str(version), "script": scriptPath})
 
 
     def run_script(self, filename):
@@ -245,6 +265,7 @@ def sync_db(argReader):
         password, 
         server, 
         argReader.get_schema(), 
+        argReader.get_target_version(),
         runner.Runner(username, password, server)).go()
 
 
