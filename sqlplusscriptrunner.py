@@ -2,7 +2,7 @@ from subprocess import  Popen, PIPE
 from distutils.version import StrictVersion
 import cx_Oracle
 
-class Runner(object):
+class OracleSqlRunner(object):
     def __init__(self, username, password, host):
         self.__username = username
         self.__password = password
@@ -40,21 +40,6 @@ class Runner(object):
 
     def drop_schema(self, schema):
         self.run_sql_command('drop user {0} cascade'.format(schema))
-
-    def get_executed_scripts(self, schema):
-        """Returns a dictionary where:
-            key = version and value = a list of all run scripts"""
-
-        scriptData = self.get_all_data_for('select version, script from version_tracking', schema)
-        result = {}
-
-        for i in scriptData:
-            version = str(StrictVersion(i[0]))
-            if not version in result:
-                result[version] = []
-            result[version].append(i[1])
-
-        return result
 
 
 

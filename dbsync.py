@@ -138,9 +138,9 @@ command
         sys.exit()
         
 
-    def process(self, actions):
+    def process(self, actions, *args):
         if self.get_command() in actions:
-            actions[self.get_command()](self)
+            actions[self.get_command()](self, *args)
         else:
             print('no action provided for command: "{0}".'.format(self.get_command()))
 
@@ -152,7 +152,7 @@ class DbSyncher(object):
         self.__targetVersion = targetVersion
         self.__sqlRunner = sqlRunner
         
-        self.__allRunScripsByVersion = sqlRunner.get_executed_scripts(schema) if self.schema_exists_in_db() else {}
+        self.__allRunScripsByVersion = self.get_executed_scripts() if self.schema_exists_in_db() else {}
         print('allRunScriptsByVersion: {0}'.format(self.__allRunScripsByVersion))
 
 
@@ -160,7 +160,7 @@ class DbSyncher(object):
         if self.schema_folder_exists():
             self.apply_schema_to_db()        
 
-        self.__applied_scripts = self.__sqlRunner.get_executed_scripts(self.__schema)
+        self.__applied_scripts = self.get_executed_scripts()
 
         for folder, version in self.get_all_version_folders():
             if self.__targetVersion:
@@ -168,6 +168,22 @@ class DbSyncher(object):
                     self.run_all_scripts_in(folder, version)
             else:
                 self.run_all_scripts_in(folder, version)
+
+    def get_executed_scripts(self):
+        """Returns a dictionary where:
+            key = version and value = a list of all run scripts"""
+
+        scriptData = self.__sqlRunner.get_all_data_for('select version, script from version_tracking', self.__schema)
+        result = {}
+
+        for i in scriptData:
+            version = str(StrictVersion(i[0]))
+            if not version in result:
+                result[version] = []
+            result[version].append(i[1])
+
+        return result
+
 
     def get_all_version_folders(self):
         root = os.path.join('.', self.__schema, 'versions')
@@ -246,8 +262,6 @@ class DbSyncher(object):
         else:
             print('failure running script: "{0}". stopping run!'.format(scriptPath))
             return False
-            
-
 
 
     def record_script_as_run(self, scriptPath, version):
@@ -259,22 +273,21 @@ class DbSyncher(object):
 
 
 
-def sync_db(argReader):
+def sync_db(argReader, sqlRunner):
     DbSyncher(
         username,
         password, 
         server, 
         argReader.get_schema(), 
         argReader.get_target_version(),
-        runner.Runner(username, password, server)).go()
+        sqlRunner).go()
 
 
-def drop_schema(argReader):
-    runner.Runner(username, password, server).drop_schema(argReader.get_schema())
+def drop_schema(argReader, sqlRunner):
+    sqlRunner.drop_schema(argReader.get_schema())
             
 
 def main(argv):
-    
     argReader = ArgumentsReader(argv)
     
     actions = {
@@ -282,7 +295,7 @@ def main(argv):
         ArgumentsReader.DROP: drop_schema
     }
     
-    argReader.process(actions)
+    argReader.process(actions, runner.OracleSqlRunner(username, password, server))
 
     
 if __name__ == '__main__':
