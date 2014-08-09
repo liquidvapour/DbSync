@@ -1,4 +1,5 @@
 from subprocess import  Popen, PIPE
+from distutils.version import StrictVersion
 import cx_Oracle
 
 class Runner(object):
@@ -11,11 +12,48 @@ class Runner(object):
     def run_sql_script(self, filename, schema = None):
         return run_sql_script(self.__connectionString, filename, schema)
 
-    def get_all_data_for(self, sqlScript):
+    def run_sql_command(self, sql, schema = None, args = {}):
+        
         with cx_Oracle.connect(self.__username, self.__password, self.__host) as cnn:
+            if schema:
+                cnn.current_schema = schema
+            cursor = cnn.cursor()            
+            if isinstance(sql, str):
+                print('Running command on schema {0}: {1}'.format(schema, sql))
+                cursor.execute(sql, args)
+            else:
+                for cmd in sql: 
+                    print('Running command on schema {0}: {1}'.format(schema, cmd))
+                    cursor.execute(cmd)
+
+            cursor.close()
+
+
+    def get_all_data_for(self, sqlScript, schema = None):
+        with cx_Oracle.connect(self.__username, self.__password, self.__host) as cnn:
+            if schema: cnn.current_schema = schema
             cursor = cnn.cursor()
+            
             result = cursor.execute(sqlScript).fetchall()
             cursor.close()
+        return result
+
+    def drop_schema(self, schema):
+        self.run_sql_command('drop user {0} cascade'.format(schema))
+
+    def get_executed_scripts(self, schema):
+        """Returns a dictionary where:
+            key = version and value = a list of all run scripts"""
+
+        scriptData = self.get_all_data_for('select version, script from version_tracking', schema)
+        result = {}
+
+        for i in scriptData:
+            version = str(StrictVersion(i[0]))
+            if not version in result:
+                result[version] = []
+            result[version].append(i[1])
+
         return result
 
 
@@ -23,17 +61,20 @@ class Runner(object):
 def tell_sqlplus_to_exit_on_first_error_with_errorcode(stdin):
     stdin.write('WHENEVER SQLERROR EXIT 1;\n')
 
+
 def set_current_schema_to(stdin, schema):
     print('setting current schema to: "{0}".'.format(schema))
     stdin.write('ALTER SESSION SET CURRENT_SCHEMA = {0};\n'.format(schema))
+
 
 def execute_sql_script(stdin, filename):
     print('executing file: "{0}".'.format(filename))
     stdin.write('@"{0}"'.format(filename))
 
+
 def drop_schema(connstr, schema):
     print('droping schema: "{0}".'.format(schema))
-    if run_sql_command(connstr, 'drop user {0} cascade;'.format(schema)):
+    if run_sql_command(connstr, 'dro user {0} cascade;'.format(schema)):
         print('"{0}" droped'.format(schema))
         return True
 
@@ -41,8 +82,7 @@ def drop_schema(connstr, schema):
 
 
 def run_sql_script(connstr, filename, schema = None):
-    command = ['sqlplus', '-S', connstr]
-    sqlplus = Popen(command, stdin=PIPE, stdout = PIPE, stderr=PIPE, universal_newlines = True)
+    sqlplus = start_sqlplus(connstr)
 
     tell_sqlplus_to_exit_on_first_error_with_errorcode(sqlplus.stdin)
 
@@ -58,11 +98,29 @@ def run_sql_script(connstr, filename, schema = None):
         return False
         
     return True
-    
 
-def run_sql_command(connstr, script):
+
+def start_sqlplus(connstr):
     command = ['sqlplus', '-S', connstr]
-    print(command)
-    sqlplus = Popen(command, stdin=PIPE, stdout = PIPE, stderr=PIPE, universal_newlines = True)
-    sqlplus.stdin.write(script)
-    return sqlplus.communicate()
+    return Popen(command, stdin=PIPE, stdout = PIPE, stderr=PIPE, universal_newlines = True)
+
+
+def run_sql_command(connstr, script, schema = None):
+    sqlplus = start_sqlplus(connstr)
+
+    tell_sqlplus_to_exit_on_first_error_with_errorcode(sqlplus.stdin)
+
+    if schema:
+        set_current_schema_to(sqlplus.stdin, schema)
+
+    print('executing sql: {0}'.format(script))
+    #sqlplus.stdin.write(script)
+    output = sqlplus.communicate('WHENEVER SQLERROR EXIT 1;\nselect from dual;\n')[0]
+    exitcode = sqlplus.wait()
+    
+    
+    if exitcode > 0:
+        print(output)
+        return False
+        
+    return True
