@@ -147,24 +147,21 @@ command
 
 
 class DbSyncher(object):
-    def __init__(self, username, password, host, schema, targetVersion, sqlRunner):
+    def __init__(self, username, password, host, schema, sqlRunner):
         self.__schema = schema
-        self.__targetVersion = targetVersion
         self.__sqlRunner = sqlRunner
         
         self.__allRunScripsByVersion = self.get_executed_scripts() if self.schema_exists_in_db() else {}
         print('allRunScriptsByVersion: {0}'.format(self.__allRunScripsByVersion))
 
 
-    def go(self):
+    def go(self, targetVersion):
         if self.schema_folder_exists():
             self.apply_schema_to_db()        
 
-        self.__applied_scripts = self.get_executed_scripts()
-
         for folder, version in self.get_all_version_folders():
-            if self.__targetVersion:
-                if self.__targetVersion >= version:
+            if targetVersion:
+                if targetVersion >= version:
                     self.run_all_scripts_in(folder, version)
             else:
                 self.run_all_scripts_in(folder, version)
@@ -279,8 +276,7 @@ def sync_db(argReader, sqlRunner):
         password, 
         server, 
         argReader.get_schema(), 
-        argReader.get_target_version(),
-        sqlRunner).go()
+        sqlRunner).go(argReader.get_target_version())
 
 
 def drop_schema(argReader, sqlRunner):
