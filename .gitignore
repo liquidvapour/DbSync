@@ -1,5 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
+#VS 2013 Python Tools user files
 *.suo
 *.user
