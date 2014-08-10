@@ -179,7 +179,7 @@ class Db(object):
         self.__schema = schema
         self.__sqlRunner = sqlRunner
         
-        self.__allRunScripsByVersion = self.get_executed_scripts() if self.schema_exists_in_db() else {}
+        self.__allRunScripsByVersion = self.get_executed_scripts() if self._schema_exists_in_db() else {}
         print('allRunScriptsByVersion: {0}'.format(self.__allRunScripsByVersion))
 
     def get_executed_scripts(self):
@@ -187,21 +187,7 @@ class Db(object):
             key = version and value = a list of all run scripts"""
 
         scriptData = self.__sqlRunner.get_all_data_for('select version, script from version_tracking', self.__schema)
-        result = {}
-
-        for i in scriptData:
-            version = str(StrictVersion(i[0]))
-            if not version in result:
-                result[version] = []
-            result[version].append(i[1])
-
-        return result
-
-
-    def schema_exists_in_db(self):
-        userData = self.__sqlRunner.get_all_data_for(GET_ALL_USERS)
-        schemas = [s[0].casefold() for s in userData]
-        return self.__schema in schemas
+        return self.__table_to_dict(scriptData)
 
 
     def make_sure_tacking_table_exists(self):
@@ -209,7 +195,7 @@ class Db(object):
 
 
     def apply_schema_to_db(self):
-        if not self.schema_exists_in_db():
+        if not self._schema_exists_in_db():
             if self.create_schema():
                 self.apply_base_line_scripts()
 
@@ -269,6 +255,24 @@ class Db(object):
         return self.__sqlRunner.run_sql_script(filename, self.__schema)
 
 
+    def _schema_exists_in_db(self):
+        userData = self.__sqlRunner.get_all_data_for(GET_ALL_USERS)
+        schemas = [s[0].casefold() for s in userData]
+        return self.__schema in schemas
+
+
+    def __table_to_dict(self, table):
+        result = {}
+
+        for i in table:
+            version = str(StrictVersion(i[0]))
+            if not version in result:
+                result[version] = []
+            result[version].append(i[1])
+
+        return result
+
+
 
 class DbUpdater(object):
     def __init__(self, db, sourceProvider):
@@ -280,12 +284,12 @@ class DbUpdater(object):
         if self.__sourceProvider.schema_folder_exists():
             self.__db.apply_schema_to_db()        
 
-        for folder, version in self.__sourceProvider.get_all_version_folders():
-            if targetVersion:
-                if targetVersion >= version:
+            for folder, version in self.__sourceProvider.get_all_version_folders():
+                if targetVersion:
+                    if targetVersion >= version:
+                        self.__db.run_all_scripts_in(folder, version)
+                else:
                     self.__db.run_all_scripts_in(folder, version)
-            else:
-                self.__db.run_all_scripts_in(folder, version)
 
 
 
