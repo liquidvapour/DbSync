@@ -147,7 +147,7 @@ command
 
 
 class Db(object):
-    def __init__(self, username, password, host, schema, sqlRunner):
+    def __init__(self, schema, sqlRunner):
         self.__schema = schema
         self.__sqlRunner = sqlRunner
         
@@ -256,6 +256,8 @@ class Db(object):
     def run_script(self, filename):
         return self.__sqlRunner.run_sql_script(filename, self.__schema)
 
+
+
 class DbUpdater(object):
     def __init__(self, db):
         self.__db = db
@@ -276,9 +278,6 @@ class DbUpdater(object):
 
 def sync_db(argReader, sqlRunner):
     db = Db(
-        username,
-        password, 
-        server, 
         argReader.get_schema(), 
         sqlRunner)
     
