@@ -263,7 +263,7 @@ class DbUpdater(object):
         self.__db = db
 
 
-    def bring_to_verions(self, targetVersion):
+    def bring_to_verion(self, targetVersion):
         if self.__db.schema_folder_exists():
             self.__db.apply_schema_to_db()        
 
@@ -282,7 +282,7 @@ def sync_db(argReader, sqlRunner):
         sqlRunner)
     
     updater = DbUpdater(db)
-    updater.bring_to_verions(argReader.get_target_version())
+    updater.bring_to_verion(argReader.get_target_version())
 
 
 def drop_schema(argReader, sqlRunner):
