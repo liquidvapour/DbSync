@@ -144,7 +144,35 @@ command
         else:
             print('no action provided for command: "{0}".'.format(self.get_command()))
 
+            
+#------------------------------------------------------------------------------
+# SourceOperations
+#------------------------------------------------------------------------------
+# Provides the source for the db
+# methods:
+# get_all_version_folders
+# schema_folder_exists
+#------------------------------------------------------------------------------
+class SourceOperations(object):
+    def __init__(self, schema):
+        self.__schema = schema
+        
+    def get_all_version_folders(self):
+        root = os.path.join('.', self.__schema, 'versions')
+        folders = get_all_folders_in(root)
+        sortedFolders = sorted(folders, key = lambda a: StrictVersion(a))
+        print('version folders: "{0}"'.format(sortedFolders))
+        return [(os.path.join(root, f), StrictVersion(f)) for f in sortedFolders]
 
+
+    def schema_folder_exists(self):
+        if not self.__schema in get_all_folders_in('.'):
+            print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(self.__schema))
+            return False
+
+        return True
+        
+    
 
 class Db(object):
     def __init__(self, schema, sqlRunner):
@@ -168,22 +196,6 @@ class Db(object):
             result[version].append(i[1])
 
         return result
-
-
-    def get_all_version_folders(self):
-        root = os.path.join('.', self.__schema, 'versions')
-        folders = get_all_folders_in(root)
-        sortedFolders = sorted(folders, key = lambda a: StrictVersion(a))
-        print('version folders: "{0}"'.format(sortedFolders))
-        return [(os.path.join(root, f), StrictVersion(f)) for f in sortedFolders]
-
-
-    def schema_folder_exists(self):
-        if not self.__schema in get_all_folders_in('.'):
-            print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(self.__schema))
-            return False
-
-        return True
 
 
     def schema_exists_in_db(self):
@@ -259,15 +271,16 @@ class Db(object):
 
 
 class DbUpdater(object):
-    def __init__(self, db):
+    def __init__(self, db, sourceProvider):
         self.__db = db
+        self.__sourceProvider = sourceProvider
 
 
     def bring_to_verion(self, targetVersion):
-        if self.__db.schema_folder_exists():
+        if self.__sourceProvider.schema_folder_exists():
             self.__db.apply_schema_to_db()        
 
-        for folder, version in self.__db.get_all_version_folders():
+        for folder, version in self.__sourceProvider.get_all_version_folders():
             if targetVersion:
                 if targetVersion >= version:
                     self.__db.run_all_scripts_in(folder, version)
@@ -281,7 +294,7 @@ def sync_db(argReader, sqlRunner):
         argReader.get_schema(), 
         sqlRunner)
     
-    updater = DbUpdater(db)
+    updater = DbUpdater(db, SourceOperations(argReader.get_schema()))
     updater.bring_to_verion(argReader.get_target_version())
 
 
