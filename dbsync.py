@@ -65,10 +65,12 @@ syntax: dbsyns.py -s <schema> -v <version> [command]
 
 arguments
 ---------
--s | --schema
+-s | -schema
     The schema you wish to apply.
--v | --version 
+-v | -version 
     The target version to bring database up to.
+-l | -loglevel
+    The required log level (DEBUG, INFO, WARN, ERROR)
 
     default: Bring database up to latest version.
 
@@ -82,8 +84,9 @@ command
         print('argv: {0}'.format(argv))
         schema = ''
         targetVersion = None
+        logLevel = 'INFO'
         try:
-            opts, args = getopt.getopt(argv, 'hs:v:', 'schema=')
+            opts, args = getopt.getopt(argv, 'hs:v:l:', 'schema=version=loglevel=')
         except getopt.GetoptError:
             self.print_help_and_exit()
             
@@ -96,6 +99,8 @@ command
                 schema = arg
             elif opt in ('-v', '-version'):
                 targetVersion = arg
+            elif opt in ('-l', '-loglevel'):
+                logLevel = arg
         
         if len(args) > 0:
             self.__command = args[0].casefold()
@@ -113,8 +118,9 @@ command
             
         self.__schema = schema
         self.__targetVersion = StrictVersion(targetVersion) if targetVersion else None
+        self.__logLevel = getattr(logging, logLevel.upper())
         
-
+        
     def get_command(self):
         return self.__command
     
@@ -126,6 +132,11 @@ command
     def get_target_version(self):
         return self.__targetVersion
             
+
+    @property
+    def log_level(self):
+        return self.__logLevel
+
 
     def print_help_and_exit(self):    
         print(ArgumentsReader.COMMAND_HELP)
@@ -280,7 +291,7 @@ class Db(object):
 
 
 
-log = logging.getLogger('dbsync')
+log = logging.getLogger(__name__)
 
 class DbUpdater(object):
     log = logging.getLogger('dbsync.DbUpdater')
@@ -322,11 +333,11 @@ def drop_schema(argReader, sqlRunner):
             
 
 def main(argv):
-    logger = logging.basicConfig(level=logging.DEBUG)
-    
     log.debug('currnet path: {0}'.format(os.path.realpath('.')))
 
     argReader = ArgumentsReader(argv)
+    
+    logger = logging.basicConfig(level=argReader.log_level)
     
     actions = {
         ArgumentsReader.SYNC: sync_db,
