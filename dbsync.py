@@ -3,6 +3,8 @@ import os
 import getopt
 import datetime
 import cx_Oracle
+import logging
+
 from distutils.version import StrictVersion
 
 import sqlplusscriptrunner as runner
@@ -45,15 +47,7 @@ CREATE_TRACKING_TABLE_SEQ = """
 INSERT_SCRIPT_INFO = """
     insert into version_tracking (id, version, script)
     values (version_tracking_id_seq.nextval, :version, :script)
-"""
-    
-def get_all_folders_in(path):
-    return [p for p in os.listdir(path) if os.path.isdir(os.path.join(path, p))]
-
-
-def get_all_files_in(path):
-    return sorted([p for p in os.listdir(path) if os.path.isfile(os.path.join(path, p))])
-    
+"""    
         
 username = 'system'
 password = 'password1234'
@@ -154,33 +148,41 @@ command
 # schema_folder_exists
 #------------------------------------------------------------------------------
 class SourceOperations(object):
+    log = logging.getLogger('dbsync.SourceOperations')
+
     def __init__(self, schema):
         self.__schema = schema
         
     def get_all_version_folders(self):
-        root = os.path.join('.', self.__schema, 'versions')
-        folders = get_all_folders_in(root)
+        root = self.get_path_to_versions_folder()
+        folders = self.get_all_folders_in(root)
         sortedFolders = sorted(folders, key = lambda a: StrictVersion(a))
-        print('version folders: "{0}"'.format(sortedFolders))
+        SourceOperations.log.info('version folders: "{0}"'.format(sortedFolders))
         return [(os.path.join(root, f), StrictVersion(f)) for f in sortedFolders]
 
 
+    def get_path_to_versions_folder(self):
+        return os.path.join('.', self.__schema, 'versions')
+
     def schema_folder_exists(self):
-        if not self.__schema in get_all_folders_in('.'):
-            print('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(self.__schema))
+        if not self.__schema in self.get_all_folders_in('.'):
+            SourceOperations.log.info('Cannot find schema folder for schema: "{0}". Please provide a folder named the same as the schema with all the appropriate scripts'.format(self.__schema))
             return False
 
         return True
         
-    
+    def get_all_folders_in(self, path):
+        return [p for p in os.listdir(path) if os.path.isdir(os.path.join(path, p))]
+
 
 class Db(object):
+    log = logging.getLogger('dbsync.Db')
+
     def __init__(self, schema, sqlRunner):
         self.__schema = schema
         self.__sqlRunner = sqlRunner
         
         self.__allRunScripsByVersion = self.get_executed_scripts() if self._schema_exists_in_db() else {}
-        print('allRunScriptsByVersion: {0}'.format(self.__allRunScripsByVersion))
 
     def get_executed_scripts(self):
         """Returns a dictionary where:
@@ -201,40 +203,44 @@ class Db(object):
 
             self.make_sure_tacking_table_exists()
         else:
-            print('schema "{0}" already exists.'.format(self.__schema))
+            Db.log.info('schema "{0}" already exists.'.format(self.__schema))
 
 
     def create_schema(self):
-        print('Running schema creation scripts for schema: "{0}".'.format(self.__schema))
+        Db.log.info('Running schema creation scripts for schema: "{0}".'.format(self.__schema))
         scriptSucceeded = self.__sqlRunner.run_sql_script(os.path.join('.', self.__schema, 'create.user.sql'))
         if scriptSucceeded:
-            print('schema ({0}) created.'.format(self.__schema))
+            Db.log.info('schema ({0}) created.'.format(self.__schema))
 
         return scriptSucceeded
 
 
     def apply_base_line_scripts(self):
-        print("applying baseline scripts")
+        Db.log.info("applying baseline scripts")
         root = os.path.join('.', self.__schema, 'baseline')
         # rp 2014-08-07: What "version" is the baseline. Is this important? If so then what is the convection for this.
         self.run_all_scripts_in(root)
 
 
-    def run_all_scripts_in(self, root, version = None):    
-        for f in get_all_files_in(root):
-            scriptPath = os.path.join(root, f)
+    def get_all_files_in(self, path):
+        Db.log.debug('get_all_files_in: {0}'.format(path))
+        return sorted([os.path.join(path, p) for p in os.listdir(path) if not p.startswith('_') and os.path.isfile(os.path.join(path, p))])
 
+
+    def run_all_scripts_in(self, root, version = None):    
+        for scriptPath in self.get_all_files_in(root):
+            Db.log.debug('considering "{0}"'.format(scriptPath))
             if version:
                 if str(version) in self.__allRunScripsByVersion:
                     if not scriptPath in self.__allRunScripsByVersion[str(version)]:
                         if not self.apply_script(scriptPath, version): break
                     else:
-                        print('{0} - {1} aleady applied.'.format(scriptPath, version))
+                        Db.log.info('"{0}" - [{1}] aleady applied.'.format(scriptPath, version))
                 else:
                     if not self.apply_script(scriptPath, version): break
             else:
                 if not self.run_script(scriptPath):
-                    print('script: {0} failed!'.format(scriptPath))
+                    Db.log.info('script: {0} failed!'.format(scriptPath))
 
 
     def apply_script(self, scriptPath, version):
@@ -243,7 +249,7 @@ class Db(object):
             self.record_script_as_run(scriptPath, version)
             return True
         else:
-            print('failure running script: "{0}". stopping run!'.format(scriptPath))
+            Db.log.info('failure running script: "{0}". stopping run!'.format(scriptPath))
             return False
 
 
@@ -274,21 +280,30 @@ class Db(object):
 
 
 
+log = logging.getLogger('dbsync')
+
 class DbUpdater(object):
+    log = logging.getLogger('dbsync.DbUpdater')
+
     def __init__(self, db, sourceProvider):
         self.__db = db
         self.__sourceProvider = sourceProvider
 
 
     def bring_to_verion(self, targetVersion):
+        
         if self.__sourceProvider.schema_folder_exists():
             self.__db.apply_schema_to_db()        
 
             for folder, version in self.__sourceProvider.get_all_version_folders():
+                DbUpdater.log.debug('considering folder: "{0}" for version: "{1}".'.format(folder, version))
                 if targetVersion:
                     if targetVersion >= version:
                         self.__db.run_all_scripts_in(folder, version)
+                    else:
+                        DbUpdater.log.debug('folder version "{0}" is greater than target version "{1}" so skipping.'.format(version, targetVersion))
                 else:
+                    DbUpdater.log.debug('No version provided to going to always apply scripts in folder.')
                     self.__db.run_all_scripts_in(folder, version)
 
 
@@ -307,6 +322,10 @@ def drop_schema(argReader, sqlRunner):
             
 
 def main(argv):
+    logger = logging.basicConfig(level=logging.DEBUG)
+    
+    log.debug('currnet path: {0}'.format(os.path.realpath('.')))
+
     argReader = ArgumentsReader(argv)
     
     actions = {

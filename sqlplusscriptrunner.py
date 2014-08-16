@@ -1,8 +1,10 @@
 from subprocess import  Popen, PIPE
 from distutils.version import StrictVersion
 import cx_Oracle
+import logging
 
 class OracleSqlRunner(object):
+    log = logging.getLogger('sqlplusscriptrunner.OracleSqlRunner')
     def __init__(self, username, password, host):
         self.__username = username
         self.__password = password
@@ -19,11 +21,11 @@ class OracleSqlRunner(object):
                 cnn.current_schema = schema
             cursor = cnn.cursor()            
             if isinstance(sql, str):
-                print('Running command on schema {0}: {1}'.format(schema, sql))
+                OracleSqlRunner.log.info('Running command on schema {0}: {1}'.format(schema, sql))
                 cursor.execute(sql, args)
             else:
                 for cmd in sql: 
-                    print('Running command on schema {0}: {1}'.format(schema, cmd))
+                    OracleSqlRunner.log.info('Running command on schema {0}: {1}'.format(schema, cmd))
                     cursor.execute(cmd)
 
             cursor.close()
@@ -43,24 +45,26 @@ class OracleSqlRunner(object):
 
 
 
+log = logging.getLogger('sqlplusscriptrunner')
+
 def tell_sqlplus_to_exit_on_first_error_with_errorcode(stdin):
     stdin.write('WHENEVER SQLERROR EXIT 1;\n')
 
 
 def set_current_schema_to(stdin, schema):
-    print('setting current schema to: "{0}".'.format(schema))
+    log.info('setting current schema to: "{0}".'.format(schema))
     stdin.write('ALTER SESSION SET CURRENT_SCHEMA = {0};\n'.format(schema))
 
 
 def execute_sql_script(stdin, filename):
-    print('executing file: "{0}".'.format(filename))
+    log.info('executing file: "{0}".'.format(filename))
     stdin.write('@"{0}"'.format(filename))
 
 
 def drop_schema(connstr, schema):
-    print('droping schema: "{0}".'.format(schema))
+    log.info('droping schema: "{0}".'.format(schema))
     if run_sql_command(connstr, 'dro user {0} cascade;'.format(schema)):
-        print('"{0}" droped'.format(schema))
+        log.info('"{0}" droped'.format(schema))
         return True
 
     return False
@@ -79,7 +83,7 @@ def run_sql_script(connstr, filename, schema = None):
     exitcode = sqlplus.wait()
     
     if exitcode > 0:
-        print(output)
+        log.info(output)
         return False
         
     return True
@@ -98,14 +102,14 @@ def run_sql_command(connstr, script, schema = None):
     if schema:
         set_current_schema_to(sqlplus.stdin, schema)
 
-    print('executing sql: {0}'.format(script))
-    #sqlplus.stdin.write(script)
+    log.info('executing sql: {0}'.format(script))
+
     output = sqlplus.communicate('WHENEVER SQLERROR EXIT 1;\nselect from dual;\n')[0]
     exitcode = sqlplus.wait()
     
     
     if exitcode > 0:
-        print(output)
+        log.info(output)
         return False
         
     return True

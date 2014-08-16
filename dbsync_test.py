@@ -1,6 +1,8 @@
 import unittest
 import unittest.mock as mock
 
+import os.path
+
 from dbsync import *
 
 class TestDbUpdater(unittest.TestCase):
@@ -80,9 +82,26 @@ class TestDb(unittest.TestCase):
 
         self.assertTrue(result)
 
-        
+    @mock.patch('dbsync.Db.get_all_files_in', return_value=['one.sql', 'two.sql'])
+    def test_when_db_told_to_apply_base_line_script_will_call_get_all_scripts_for_baseline_folder(self, getAllFilesIn):
+        sqlRunner = mock.MagicMock()
+        sut = Db('test', sqlRunner)
+        result = sut.apply_base_line_scripts()
+        getAllFilesIn.assert_called_with(os.path.join('.', 'test', 'baseline'))
+
+
+    @mock.patch('os.path.isfile', return_value=True)
+    @mock.patch('os.listdir', return_value=['one.sql', 'two.sql', '_three.sql'])
+    def test_when_db_told_to_get_all_files_in_folder_will_not_return_files_starting_with_underscore(self, listdir, isfile):
+        sqlRunner = mock.MagicMock()
+        sut = Db('test', sqlRunner)
+        result = sut.get_all_files_in(os.path.join('.', 'root'))
+        self.assertNotIn(os.path.join('.', 'root', '_three.sql'), result)
+        self.assertIn(os.path.join('.', 'root', 'one.sql'), result)
+        self.assertIn(os.path.join('.', 'root', 'two.sql'), result)
 
         
-
 if __name__ == "__main__":
+    logger = logging.basicConfig(level=logging.WARN)
+
     unittest.main()
