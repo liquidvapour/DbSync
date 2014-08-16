@@ -54,6 +54,8 @@ password = 'password1234'
 server = 'localhost:1521/XE'    
 
 class ArgumentsReader(object):
+    log = logging.getLogger(__name__ + '.ArgumentsReader')
+
     SYNC = "sync"
     DROP = "drop"
     COMMANDS = (SYNC, DROP)
@@ -61,59 +63,61 @@ class ArgumentsReader(object):
 ---------------
 db syncher help
 ---------------
-syntax: dbsyns.py -s <schema> -v <version> [command]
+syntax: dbsyns.py --schema=<schema> [--version=<version>] <command>
 
 arguments
 ---------
--s | -schema
+--schema   | -s
     The schema you wish to apply.
--v | -version 
+
+--version  | -v
     The target version to bring database up to.
--l | -loglevel
+    default: If not provided will bring database up to latest version.
+
+--loglevel | -l
     The required log level (DEBUG, INFO, WARN, ERROR)
 
-    default: Bring database up to latest version.
 
 command 
-    sync (default): syncronises the schema with source control
-    drop: drops the schema.
+    --sync (default): syncronises the schema with source control
+    --drop: drops the schema.
 
 """
 
     def __init__(self, argv):
-        print('argv: {0}'.format(argv))
+        ArgumentsReader.log.debug('argv: {0}'.format(argv))
         schema = ''
         targetVersion = None
         logLevel = 'INFO'
         try:
-            opts, args = getopt.getopt(argv, 'hs:v:l:', 'schema=version=loglevel=')
+            opts, args = getopt.getopt(argv, 'hs:v:l:', ['schema=', 'version=', 'loglevel=', 'help'])
         except getopt.GetoptError:
             self.print_help_and_exit()
             
-        print('opts: {0}'.format(opts))
-        print('args: {0}'.format(args))
+        ArgumentsReader.log.debug('opts: {0}'.format(opts))
+        ArgumentsReader.log.debug('args: {0}'.format(args))
         for opt, arg in opts:
-            if opt == '-h':
+            if opt in ('-h', '--help'):
                 self.print_help_and_exit()
-            elif opt in ('-s', '-schema'):
+            elif opt in ('-s', '--schema'):
                 schema = arg
-            elif opt in ('-v', '-version'):
+            elif opt in ('-v', '--version'):
                 targetVersion = arg
-            elif opt in ('-l', '-loglevel'):
+            elif opt in ('-l', '--loglevel'):
                 logLevel = arg
         
         if len(args) > 0:
             self.__command = args[0].casefold()
         else:
-            print('no command provided so defaulting to "sync".')
+            ArgumentsReader.log.warn('no command provided so defaulting to "sync".')
             self.__command = "sync"
             
         if not self.__command in ArgumentsReader.COMMANDS: 
-            print('command:"{0}" not one of the valid commands: {1}'.format(self.__command, ArgumentsReader.COMMANDS))
+            ArgumentsReader.log.warn('command:"{0}" not one of the valid commands: {1}'.format(self.__command, ArgumentsReader.COMMANDS))
             self.print_help_and_exit()
             
         if not schema:
-            print('no schema provided')
+            ArgumentsReader.log.error('no schema provided')
             self.print_help_and_exit()
             
         self.__schema = schema
@@ -147,7 +151,7 @@ command
         if self.get_command() in actions:
             actions[self.get_command()](self, *args)
         else:
-            print('no action provided for command: "{0}".'.format(self.get_command()))
+            ArgumentsReader.log.warn('no action provided for command: "{0}".'.format(self.get_command()))
 
             
 #------------------------------------------------------------------------------
@@ -333,11 +337,12 @@ def drop_schema(argReader, sqlRunner):
             
 
 def main(argv):
+    logger = logging.basicConfig(level=logging.WARN)
     log.debug('currnet path: {0}'.format(os.path.realpath('.')))
 
     argReader = ArgumentsReader(argv)
+    logging.getLogger().setLevel(argReader.log_level)
     
-    logger = logging.basicConfig(level=argReader.log_level)
     
     actions = {
         ArgumentsReader.SYNC: sync_db,
