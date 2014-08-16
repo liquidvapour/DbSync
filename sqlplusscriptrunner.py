@@ -21,11 +21,11 @@ class OracleSqlRunner(object):
                 cnn.current_schema = schema
             cursor = cnn.cursor()            
             if isinstance(sql, str):
-                OracleSqlRunner.log.info('Running command on schema {0}: {1}'.format(schema, sql))
+                OracleSqlRunner.log.debug('Running command on schema {0}: {1}'.format(schema, sql))
                 cursor.execute(sql, args)
             else:
                 for cmd in sql: 
-                    OracleSqlRunner.log.info('Running command on schema {0}: {1}'.format(schema, cmd))
+                    OracleSqlRunner.log.debug('Running command on schema {0}: {1}'.format(schema, cmd))
                     cursor.execute(cmd)
 
             cursor.close()
