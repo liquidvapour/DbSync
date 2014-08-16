@@ -172,7 +172,7 @@ class SourceOperations(object):
         return True
         
     def get_all_folders_in(self, path):
-        return [p for p in os.listdir(path) if os.path.isdir(os.path.join(path, p))]
+        return [p for p in os.listdir(path) if not p.startswith('_') and os.path.isdir(os.path.join(path, p))]
 
 
 class Db(object):
