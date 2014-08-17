@@ -1,1 +1,1 @@
-@robocopy . c:\users\ra-el\Documents\Python\MyModules *.py
+@robocopy . %homepath%\Documents\Python\MyModules *.py /XF test_*
