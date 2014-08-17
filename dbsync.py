@@ -308,7 +308,7 @@ class DbUpdater(object):
     def bring_to_verion(self, targetVersion):
         
         if self.__sourceProvider.schema_folder_exists():
-            self.__db.apply_schema_to_db()        
+            self.__db.apply_schema_to_db()
 
             for folder, version in self.__sourceProvider.get_all_version_folders():
                 DbUpdater.log.debug('considering folder: "{0}" for version: "{1}".'.format(folder, version))
@@ -337,20 +337,22 @@ def drop_schema(argReader, sqlRunner):
             
 
 def main(argv):
-    logger = logging.basicConfig(level=logging.WARN)
-    log.debug('currnet path: {0}'.format(os.path.realpath('.')))
+    try:
+        logger = logging.basicConfig(level=logging.WARN)
+        log.debug('currnet path: {0}'.format(os.path.realpath('.')))
 
-    argReader = ArgumentsReader(argv)
-    logging.getLogger().setLevel(argReader.log_level)
+        argReader = ArgumentsReader(argv)
+        logging.getLogger().setLevel(argReader.log_level)
     
     
-    actions = {
-        ArgumentsReader.SYNC: sync_db,
-        ArgumentsReader.DROP: drop_schema
-    }
+        actions = {
+            ArgumentsReader.SYNC: sync_db,
+            ArgumentsReader.DROP: drop_schema
+        }
     
-    argReader.process(actions, runner.OracleSqlRunner(username, password, server))
-
+        argReader.process(actions, runner.OracleSqlRunner(username, password, server))
+    except Exception as ex:
+        log.error("Error during dbsyn.", exc_info=ex)
     
 if __name__ == '__main__':
     main(sys.argv[1:])

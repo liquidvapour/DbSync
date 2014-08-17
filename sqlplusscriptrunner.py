@@ -1,7 +1,13 @@
 from subprocess import  Popen, PIPE
 from distutils.version import StrictVersion
+import os.path
 import cx_Oracle
 import logging
+
+
+class ScriptFailedException(Exception):
+    def __init__(self, scriptPath):
+        self.script_path = scriptPath
 
 class OracleSqlRunner(object):
     log = logging.getLogger('sqlplusscriptrunner.OracleSqlRunner')
@@ -57,6 +63,8 @@ def set_current_schema_to(stdin, schema):
 
 
 def execute_sql_script(stdin, filename):
+    if not os.path.exists(filename):
+        raise FileNotFoundError(filename)
     log.info('executing file: "{0}".'.format(filename))
     stdin.write('@"{0}"'.format(filename))
 
@@ -83,8 +91,9 @@ def run_sql_script(connstr, filename, schema = None):
     exitcode = sqlplus.wait()
     
     if exitcode > 0:
+        log.error('script failed with exit code: "{0}"'.format(exitcode))
         log.info(output)
-        return False
+        raise ScriptFailedException(filename)
         
     return True
 

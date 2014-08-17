@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{bdeab1de-74d3-47c3-ba73-f2a76a5a2614}</ProjectGuid>
     <ProjectHome />
-    <StartupFile>dbsync_test.py</StartupFile>
+    <StartupFile>test_dbsync.py</StartupFile>
     <SearchPath />
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
@@ -22,8 +22,9 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
   <ItemGroup>
     <Compile Include="dbsync.py" />
-    <Compile Include="dbsync_test.py" />
+    <Compile Include="test_dbsync.py" />
     <Compile Include="sqlplusscriptrunner.py" />
+    <Compile Include="test_sqlplusscriptrunner.py" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
