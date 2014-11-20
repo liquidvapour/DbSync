@@ -63,7 +63,7 @@ class ArgumentsReader(object):
 ---------------
 db syncher help
 ---------------
-syntax: dbsyns.py --schema=<schema> [--version=<version>] <command>
+syntax: dbsync.py --schema=<schema> [--version=<version>] <command>
 
 arguments
 ---------
